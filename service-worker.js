@@ -18,7 +18,7 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const url = e.request.url;
   // Never intercept streaming/video requests - always go to network live
-  if (url.includes('.m3u8') || url.includes('.ts') || url.includes('wurl.com') || url.includes('akamai')) {
+  if (url.includes('.m3u8') || url.includes('.m3u') || url.includes('.ts') || url.includes('wurl.com') || url.includes('akamai') || url.includes('iptv-org')) {
     return;
   }
   // App shell: network-first, fallback to cache (so updates show up when online)
