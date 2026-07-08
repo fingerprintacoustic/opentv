@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpenTV - Free Live TV</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0a0a0a">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="OpenTV">
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0a;color:#fff;font-family:Arial,sans-serif;height:100vh;overflow:hidden}
+#app{display:flex;height:100vh}
+#sidebar{width:280px;background:#111;display:flex;flex-direction:column;border-right:1px solid #1e1e1e}
+#hdr{padding:12px;background:#0d0d1f;border-bottom:1px solid #1e1e1e}
+#logo{font-size:2em;font-weight:900;color:#e50914;letter-spacing:4px}#logo span{color:#fff}
+#sub{font-size:0.65em;color:#444;margin-top:2px;letter-spacing:1px}#srch{width:100%;padding:9px 12px;background:#0a0a0a;border:none;border-bottom:1px solid #1e1e1e;color:#fff;font-size:0.85em;outline:none}
+#srch::placeholder{color:#333}
+#gtabs{display:flex;overflow-x:auto;background:#0d0d0d;border-bottom:1px solid #1a1a1a;scrollbar-width:none}
+#gtabs::-webkit-scrollbar{display:none}
+.gt{flex-shrink:0;padding:6px 10px;font-size:0.68em;cursor:pointer;color:#555;border-bottom:2px solid transparent;white-space:nowrap}
+.gt.on{color:#e50914;border-bottom-color:#e50914}
+#clist{flex:1;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#222 #111}
+#clist::-webkit-scrollbar{width:3px}
+#clist::-webkit-scrollbar-thumb{background:#222}
+.ch{display:flex;align-items:center;padding:8px 10px;cursor:pointer;border-bottom:1px solid #141414;gap:8px}
+.ch:hover,.ch.on{background:#131323}
+.ch.on{border-left:3px solid #e50914}
+.cico{width:8px;height:8px;border-radius:50%;background:#333;flex-shrink:0}
+.ch.extlink .cico{background:#2ea8e5}
+.cname{font-size:0.78em;color:#bbb}
+.cgrp{font-size:0.6em;color:#3a3a3a;margin-top:1px}
+.extbadge{margin-left:auto;font-size:0.55em;color:#2ea8e5;border:1px solid #1a3a4a;padding:1px 5px;border-radius:3px}
+#pa{flex:1;display:flex;flex-direction:column;background:#000}
+#pbar{height:3px;background:#e50914;width:0;transition:width 0.3s}
+#vw{flex:1;position:relative}
+video{width:100%;height:100%;object-fit:contain;background:#000;display:block}
+#ov{position:absolute;inset:0;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:20px}
+#ovlogo{font-size:3em;font-weight:900;color:#e50914;letter-spacing:6px}#ovlogo span{color:#fff}
+#ovtxt{color:#444;font-size:0.85em}
+#ovcount{color:#e50914;font-size:1.4em;font-weight:bold;min-height:30px}
+#bot{padding:8px 14px;background:#0a0a0a;border-top:1px solid #1a1a1a;display:flex;align-items:center;gap:8px;min-height:40px}
+#livdot{width:7px;height:7px;border-radius:50%;background:#333;flex-shrink:0}
+#livdot.live{background:#e50914;animation:pulse 1.3s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.2}}
+#nowname{font-size:0.78em;color:#888}#nowname b{color:#ddd}
+#chcount{font-size:0.65em;color:#333;margin-left:auto}
+@media(max-width:650px){#app{flex-direction:column}#sidebar{width:100%;height:42vh;border-right:none;border-bottom:1px solid #1e1e1e}#pa{height:58vh}}
+</style>
+</head>
+<body>
+<div id="app">
+<div id="sidebar">
+<div id="hdr"><div id="logo">Open<span>TV</span></div><div id="sub">FREE LIVE TV</div></div>
+<input id="srch" placeholder="Search channels..." type="text">
+<div id="gtabs"></div>
+<div id="clist"></div>
+</div>
+<div id="pa">
+<div id="pbar"></div>
+<div id="vw">
+<video id="vid" controls playsinline></video>
+<div id="ov">
+<div id="ovlogo">Open<span>TV</span></div>
+<div id="ovtxt">Loading channels...</div>
+<div id="ovcount"></div>
+</div>
+</div>
+<div id="bot"><div id="livdot"></div><div id="nowname"><b id="nn">Select a channel to watch</b></div><div id="chcount"></div></div>
+</div>
+</div>
+<script>
+const CHANNELS=[
+{n:'ABC News',g:'News',u:'https://abcnewslive.akamaized.net/hls/live/2014500/abcnewslive/master.m3u8'},
+{n:'Al Jazeera English',g:'News',u:'https://live-hls-web-aje.getaj.net/AJE/01.m3u8'},
+{n:'Bloomberg TV',g:'News',u:'https://bloomberg-us-east.fubo.tv/v2/playlist/live/MPEG4_1080p_AV/MPEG4_1080p_AV.m3u8'},
+{n:'DW English',g:'News',u:'https://dwstream4-lh.akamaihd.net/i/dwstream4_live@124409/master.m3u8'},
+{n:'France 24 English',g:'News',u:'https://static.france24.com/live/F24_EN_LO_HLS/live_web.m3u8'},
+{n:'NASA TV',g:'Science',u:'https://ntv1.akamaized.net/hls/live/2014075/NASA-NTV1-HLS/master.m3u8'},
+{n:'Euronews English',g:'News',u:'https://rakuten-euronews-1-gb.samsung.wurl.com/manifest/playlist.m3u8'},
+{n:'Cronos Network',g:'Entertainment',u:'https://rakuten-cronosnetwork-1-us.samsung.wurl.com/manifest/playlist.m3u8'},
+{n:'American Classics',g:'Movies',u:'https://rakuten-americanclassicmovies-1-us.samsung.wurl.com/manifest/playlist.m3u8'},
+{n:'Midnight Pulp',g:'Movies',u:'https://rakuten-midnightpulp-1-us.samsung.wurl.com/manifest/playlist.m3u8'},
+{n:'FilmRise Free Movies',g:'Movies',u:'https://rakuten-filmrisefreemovies-1-us.samsung.wurl.com/manifest/playlist.m3u8'},
+{n:'Shout Factory TV',g:'Entertainment',u:'https://rakuten-shoutfactorytv-1-us.samsung.wurl.com/manifest/playlist.m3u8'},
+{n:'Dove Channel',g:'Family',u:'https://rakuten-dovechannel-1-us.samsung.wurl.com/manifest/playlist.m3u8'},
+{n:'Comedy Dynamics',g:'Comedy',u:'https://rakuten-comedydynamics-1-us.samsung.wurl.com/manifest/playlist.m3u8'},
+{n:'Fuse',g:'Music',u:'https://rakuten-fuse-1-us.samsung.wurl.com/manifest/playlist.m3u8'},
+{n:'Fuse Beats',g:'Music',u:'https://rakuten-fusebeats-1-us.samsung.wurl.com/manifest/playlist.m3u8'},
+{n:'Tastemade',g:'Food',u:'https://rakuten-tastemade-1-us.samsung.wurl.com/manifest/playlist.m3u8'},
+{n:'Outside TV',g:'Sports',u:'https://rakuten-outsidetv-1-us.samsung.wurl.com/manifest/playlist.m3u8'},
+{n:'Ride TV',g:'Sports',u:'https://rakuten-ridetv-1-us.samsung.wurl.com/manifest/playlist.m3u8'},
+{n:'World Cup 2026 (SBS)',g:'Sports',link:'https://www.sbs.com.au/ondemand/fifa-world-cup-2026'},
+{n:'Laugh Out Loud',g:'Comedy',u:'https://rakuten-laughoutloud-1-us.samsung.wurl.com/manifest/playlist.m3u8'},
+{n:'Story TV',g:'Entertainment',u:'https://rakuten-storytv-1-us.samsung.wurl.com/manifest/playlist.m3u8'},
+{n:'Nosey',g:'Entertainment',u:'https://rakuten-nosey-1-us.samsung.wurl.com/manifest/playlist.m3u8'},
+{n:'Revry',g:'Entertainment',u:'https://rakuten-revry-1-us.samsung.wurl.com/manifest/playlist.m3u8'},
+{n:'Screambox',g:'Horror',u:'https://rakuten-screambox-1-us.samsung.wurl.com/manifest/playlist.m3u8'},
+{n:'UMC',g:'Entertainment',u:'https://rakuten-umc-1-us.samsung.wurl.com/manifest/playlist.m3u8'},
+{n:'Feeln',g:'Family',u:'https://rakuten-feeln-1-us.samsung.wurl.com/manifest/playlist.m3u8'},
+{n:'Docurama',g:'Documentary',u:'https://rakuten-docurama-1-us.samsung.wurl.com/manifest/playlist.m3u8'},
+{n:'Fandor',g:'Movies',u:'https://rakuten-fandor-1-us.samsung.wurl.com/manifest/playlist.m3u8'},
+{n:'ScreenMedia',g:'Movies',u:'https://rakuten-screenmedia-1-us.samsung.wurl.com/manifest/playlist.m3u8'},
+{n:'CONtv',g:'Entertainment',u:'https://rakuten-contv-1-us.samsung.wurl.com/manifest/playlist.m3u8'},
+];
+let group='All',hlsi=null,actEl=null;
+const vid=document.getElementById('vid'),ov=document.getElementById('ov'),ovtxt=document.getElementById('ovtxt'),ovcount=document.getElementById('ovcount'),clist=document.getElementById('clist'),srch=document.getElementById('srch'),gtabs=document.getElementById('gtabs'),nn=document.getElementById('nn'),livdot=document.getElementById('livdot'),chcount=document.getElementById('chcount'),pbar=document.getElementById('pbar');
+function buildTabs(){
+const gs=['All',...new Set(CHANNELS.map(c=>c.g).sort())];
+gtabs.innerHTML='';
+gs.forEach(g=>{
+const t=document.createElement('div');t.className='gt'+(g===group?' on':'');t.textContent=g;
+t.onclick=()=>{group=g;document.querySelectorAll('.gt').forEach(x=>x.classList.remove('on'));t.classList.add('on');render();};
+gtabs.appendChild(t);});}
+function render(){
+const q=srch.value.toLowerCase();
+const list=CHANNELS.filter(c=>(group==='All'||c.g===group)&&(!q||c.n.toLowerCase().includes(q)));
+chcount.textContent=list.length+' channels';
+clist.innerHTML='';
+list.forEach(c=>{
+const d=document.createElement('div');d.className='ch'+(c.link?' extlink':'')+(actEl&&actEl.dataset.key===(c.u||c.link)?' on':'');
+d.dataset.key=c.u||c.link;
+d.innerHTML='<div class="cico"></div><div><div class="cname">'+c.n+'</div><div class="cgrp">'+c.g+'</div></div>'+(c.link?'<div class="extbadge">OPEN</div>':'');
+d.onclick=()=>c.link?openExternal(c,d):play(c,d);
+clist.appendChild(d);});}
+function openExternal(c,el){
+if(actEl)actEl.classList.remove('on');
+actEl=el;el.classList.add('on');
+window.open(c.link,'_blank','noopener');
+}
+function play(c,el){
+if(actEl)actEl.classList.remove('on');
+actEl=el;el.classList.add('on');
+nn.textContent=c.n;livdot.className='';ov.style.display='none';
+if(hlsi){hlsi.destroy();hlsi=null;}
+if(vid.canPlayType('application/vnd.apple.mpegURL')||vid.canPlayType('application/x-mpegURL')){
+vid.src=c.u;vid.play().catch(()=>{});livdot.className='live';
+}else if(Hls.isSupported()){
+hlsi=new Hls();hlsi.loadSource(c.u);hlsi.attachMedia(vid);
+hlsi.on(Hls.Events.MANIFEST_PARSED,()=>{vid.play().catch(()=>{});livdot.className='live';});
+hlsi.on(Hls.Events.ERROR,(_,d)=>{if(d.fatal){ov.style.display='flex';ovtxt.textContent='Stream unavailable - try another channel';}});
+}else{
+ov.style.display='flex';ovtxt.textContent='Browser not supported. Use Chrome, Firefox, Edge or Safari.';}}
+srch.addEventListener('input',render);
+let c=3;
+ovcount.textContent='Starting in '+c+'...';
+const t=setInterval(()=>{
+c--;if(c>0){ovcount.textContent='Starting in '+c+'...';}else{
+clearInterval(t);ovcount.textContent='';
+ovtxt.textContent='Pick any channel to start watching 📺';
+buildTabs();render();}},1000);
+if('serviceWorker' in navigator){
+window.addEventListener('load',()=>{navigator.serviceWorker.register('service-worker.js').catch(()=>{});});
+}
+</script>
+</body>
+</html>
