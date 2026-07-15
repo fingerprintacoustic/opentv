@@ -93,12 +93,20 @@ const SOURCE_LISTS = [
   { url: 'https://iptv-org.github.io/iptv/categories/movies.m3u', group: 'Movies', limit: 20 },
   { url: 'https://iptv-org.github.io/iptv/categories/music.m3u', group: 'Music', limit: 15 },
   { url: 'https://iptv-org.github.io/iptv/categories/documentary.m3u', group: 'Documentary', limit: 15 },
-  { url: 'https://iptv-org.github.io/iptv/categories/general.m3u', group: 'Entertainment', limit: 20 },
+  { url: 'https://iptv-org.github.io/iptv/categories/kids.m3u', group: 'Kids', limit: 15 },
+  { url: 'https://iptv-org.github.io/iptv/categories/science.m3u', group: 'Science', limit: 10 },
 ];
 
 let CHANNELS = [...EXTRA_CHANNELS];
 let group='All',hlsi=null,actEl=null,failTimer=null;
 const vid=document.getElementById('vid'),ov=document.getElementById('ov'),ovtxt=document.getElementById('ovtxt'),ovcount=document.getElementById('ovcount'),clist=document.getElementById('clist'),srch=document.getElementById('srch'),gtabs=document.getElementById('gtabs'),nn=document.getElementById('nn'),livdot=document.getElementById('livdot'),chcount=document.getElementById('chcount'),pbar=document.getElementById('pbar');
+
+const BLOCKED_KEYWORDS = ['xxx','adult','porn','playboy','erotic','+18','18+','sex'];
+
+function isBlocked(name, grp) {
+  const t = (name + ' ' + grp).toLowerCase();
+  return BLOCKED_KEYWORDS.some(k => t.includes(k));
+}
 
 function parseM3U(text, fallbackGroup) {
   const lines = text.split('\n');
@@ -112,7 +120,7 @@ function parseM3U(text, fallbackGroup) {
       const grpMatch = line.match(/group-title="([^"]*)"/);
       const g = grpMatch && grpMatch[1] ? grpMatch[1] : fallbackGroup;
       const next = lines[i + 1] ? lines[i + 1].trim() : '';
-      if (next && !next.startsWith('#')) {
+      if (next && !next.startsWith('#') && !isBlocked(name, g || fallbackGroup)) {
         out.push({ n: name, g: g || fallbackGroup, u: next });
       }
     }
